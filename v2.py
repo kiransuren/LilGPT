@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 from torch.nn import functional as F
 from character_tokenizer import CharacterTokenizer
+import matplotlib.pyplot as plt
 
 
 # hyperparameters
@@ -11,7 +12,7 @@ max_iters = 5000
 eval_interval = 500
 learning_rate = 3e-4
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
-eval_iters = 200
+eval_iters = 20
 n_embd = 384
 n_head = 6
 n_layer = 6
@@ -192,23 +193,43 @@ m = model.to(device)
 # Create a PyTorch optimizer
 optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate)
 
-# Run training step
+# For live plotting
+train_losses = []
+val_losses = []
+steps = []
+plt.ion()
+fig, ax = plt.subplots()
+line1, = ax.plot([], [], label='Train Loss')
+line2, = ax.plot([], [], label='Val Loss')
+ax.set_xlabel('Step')
+ax.set_ylabel('Loss')
+ax.legend()
 
+# Run training step
 for iter in range(max_iters):
-    
     # evaluate loss on train and val sets every evaluation interval
     if iter % eval_interval == 0:
         losses = estimate_loss()
         print(f"step {iter}: train loss {losses['train']:.4f}, val loss {losses['val']:.4f}")
-        
+        train_losses.append(losses['train'])
+        val_losses.append(losses['val'])
+        steps.append(iter)
+        line1.set_data(steps, train_losses)
+        line2.set_data(steps, val_losses)
+        ax.relim()
+        ax.autoscale_view()
+        plt.draw()
+        plt.pause(0.01)
     # sample a batch of data
     xb, yb = get_batch('train')
-    
     # evaluate the loss and step the optimizer
     logits, loss = model(xb, yb)
     optimizer.zero_grad(set_to_none=True) 
     loss.backward()
     optimizer.step()
+
+plt.ioff()
+plt.show()
 
 # generate from the model (inference)
 context = torch.zeros((1,1), dtype=torch.long, device=device)
